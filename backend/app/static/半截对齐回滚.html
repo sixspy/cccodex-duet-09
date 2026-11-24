@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>半截对齐回滚 · 对拍</title>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+  <div class="壳">
+    <header class="顶栏">
+      <div class="顶左">
+        <div class="牌名">对拍</div>
+        <div class="牌骨">左轨装载 → 右轨装载 → 同键对齐落差 → 单边悬账 → 对拍结论</div>
+      </div>
+      <nav class="管线">
+          <a href="/">对拍台</a>
+          <a href="/左轨.html">左轨流水</a>
+          <a href="/右轨.html">右轨流水</a>
+          <a href="/对齐差.html">对齐差表</a>
+          <a href="/悬账单.html">悬账单</a>
+          <a href="/对拍结论.html">对拍结论</a>
+          <a href="/源登记.html">源登记</a>
+          <a href="/轨规.html">轨规</a>
+          <a href="/半截对齐回滚.html" class="亮">半截回滚</a>
+      </nav>
+    </header>
+    <main class="主">
+
+      <section class="行卡">
+        <h1>半截对齐回滚</h1>
+        <p class="说明">键对齐编排事务收口：开票(趟号) → 逐键写在途差/悬 → 单事务收口。读到半截绿的本题解药——失败趟择形态收口，差集悬账与结论读引用同票(趟号)。</p>
+        <div class="标签行">
+          <span class="标签">清回：整趟清回，现行回趟前空集，切流账册钉失败指纹，结论读空差集</span>
+          <span class="标签">双写：已成功键留现行，肇事键进只读归档旁路凭证，结论读现行部分集</span>
+        </div>
+        <div class="工具条">
+          <label>收口形态
+            <select id="形态">
+              <option value="清回">清回（整趟清回）</option>
+              <option value="双写">双写（部分留现行）</option>
+            </select>
+          </label>
+          <label>肇事键(注入中途失败,空=纯成功)
+            <input id="肇事键" placeholder="如 ORD-102" style="width:140px"/>
+          </label>
+          <button id="跑">跑一趟</button>
+          <button class="次" id="结论">跑结论</button>
+          <button class="次" id="刷">刷新</button>
+        </div>
+        <pre class="报" id="报"></pre>
+      </section>
+
+      <section class="行卡">
+        <h2>对齐收口（只读）</h2>
+        <p class="说明">趟号 · 形态标记 · 现行差行数 · 归档键 · 失败指纹 · valid（报告与可读集一致性复核）。</p>
+        <div id="收口表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>趟流水</h2>
+        <div id="趟表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>差详情</h2>
+        <div class="工具条">
+          <label><input type="checkbox" id="只看现行"/> 只看现行（在途/清回/历史不读）</label>
+        </div>
+        <div id="差表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>悬账卡片</h2>
+        <div id="悬卡"></div>
+        <div id="悬表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>只读归档旁路凭证</h2>
+        <div id="归档表"></div>
+      </section>
+
+      <section class="行卡">
+        <h2>对拍结论（读引用同票）</h2>
+        <div id="结论表"></div>
+      </section>
+
+    </main>
+  </div>
+  <script src="/common.js"></script>
+  <script>
+(async () => {
+  const 现行框 = document.getElementById("只看现行");
+  const paint = async () => {
+    const [收口, 趟, 差, 悬, 悬现行, 归档, 结论] = await Promise.all([
+      get("/api/半截对齐回滚/收口"),
+      get("/api/半截对齐回滚/趟"),
+      get("/api/半截对齐回滚/差" + (现行框.checked ? "?现行=true" : "")),
+      get("/api/半截对齐回滚/悬账"),
+      get("/api/半截对齐回滚/悬账?现行=true"),
+      get("/api/半截对齐回滚/归档"),
+      get("/api/半截对齐回滚/结论"),
+    ]);
+    document.getElementById("收口表").innerHTML = 表(
+      ["趟号","形态标记","现行差行数","归档键","失败指纹","valid","结果","已写/键总","时刻"],
+      收口,
+      r => `<td>${r.趟号}</td><td>${徽(r.形态标记)}</td><td>${r.现行差行数}</td>
+        <td>${r.归档键||"-"}</td><td>${r.失败指纹||"-"}</td>
+        <td>${徽(r.valid ? "valid" : "invalid")}</td><td>${徽(r.结果)}</td>
+        <td>${r.已写键数}/${r.键总数}</td><td>${r.时刻}</td>`
+    );
+    document.getElementById("趟表").innerHTML = 表(
+      ["趟号","形态","状态","结果","肇事键","失败指纹","开始时刻","收口时刻"],
+      趟,
+      r => `<td>${r.趟号}</td><td>${r.形态}</td><td>${徽(r.状态)}</td><td>${徽(r.结果||"-")}</td>
+        <td>${r.肇事键||"-"}</td><td>${r.失败指纹||"-"}</td><td>${r.开始时刻}</td><td>${r.收口时刻||"-"}</td>`
+    );
+    document.getElementById("差表").innerHTML = 表(
+      ["编号","趟号","业务键","左金额分","右金额分","差型","可见","说明","时刻"],
+      差,
+      r => `<td>${r.编号}</td><td>${r.趟号}</td><td>${r.业务键}</td><td>${r.左金额分 ?? "-"}</td>
+        <td>${r.右金额分 ?? "-"}</td><td>${徽(r.差型)}</td><td>${徽(r.可见)}</td><td>${r.说明}</td><td>${r.时刻}</td>`
+    );
+    const 现行悬 = 悬现行;
+    document.getElementById("悬卡").innerHTML = 统计([
+      ["现行悬账", 现行悬.length],
+      ["左悬", 现行悬.filter(r => r.悬边 === "左").length],
+      ["右悬", 现行悬.filter(r => r.悬边 === "右").length],
+      ["在途残留", 悬.filter(r => r.可见 === "在途").length],
+      ["已清回", 悬.filter(r => r.可见 === "清回").length],
+    ]);
+    document.getElementById("悬表").innerHTML = 表(
+      ["编号","趟号","业务键","悬边","金额分","原因","可见","时刻"],
+      悬,
+      r => `<td>${r.编号}</td><td>${r.趟号}</td><td>${r.业务键}</td><td>${徽(r.悬边)}</td>
+        <td>${r.金额分}</td><td>${r.原因}</td><td>${徽(r.可见)}</td><td>${r.时刻}</td>`
+    );
+    document.getElementById("归档表").innerHTML = 表(
+      ["编号","趟号","业务键","左金额分","右金额分","失败指纹","说明","时刻"],
+      归档,
+      r => `<td>${r.编号}</td><td>${r.趟号}</td><td>${r.业务键}</td><td>${r.左金额分 ?? "-"}</td>
+        <td>${r.右金额分 ?? "-"}</td><td>${r.失败指纹}</td><td>${r.说明}</td><td>${r.时刻}</td>`
+    );
+    document.getElementById("结论表").innerHTML = 表(
+      ["编号","趟号","形态","现行差行数","悬账数","归档键","是否通过","说明","时刻"],
+      结论,
+      r => `<td>${r.编号}</td><td>${r.趟号}</td><td>${徽(r.形态)}</td><td>${r.现行差行数}</td>
+        <td>${r.悬账数}</td><td>${r.归档键||"-"}</td><td>${徽(r.是否通过)}</td><td>${r.说明}</td><td>${r.时刻}</td>`
+    );
+  };
+  await paint();
+  document.getElementById("跑").onclick = async () => {
+    const 体 = {形态: document.getElementById("形态").value, 肇事键: document.getElementById("肇事键").value.trim()};
+    document.getElementById("报").textContent = JSON.stringify(await post("/api/半截对齐回滚/跑", 体), null, 2);
+    await paint();
+  };
+  document.getElementById("结论").onclick = async () => {
+    document.getElementById("报").textContent = JSON.stringify(await post("/api/半截对齐回滚/结论"), null, 2);
+    await paint();
+  };
+  document.getElementById("刷").onclick = paint;
+  现行框.onchange = paint;
+})();
+</script>
+</body>
+</html>

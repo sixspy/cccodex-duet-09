@@ -1,0 +1,83 @@
+"""半截对齐回滚：模块自属表。与基线 happy path 表完全错开，互不改口径。"""
+from __future__ import annotations
+from app.db import 连接
+
+建表 = """
+CREATE TABLE IF NOT EXISTS 半回_趟 (
+  趟号 INTEGER PRIMARY KEY AUTOINCREMENT,
+  形态 TEXT NOT NULL DEFAULT '清回',
+  状态 TEXT NOT NULL DEFAULT '在途',
+  结果 TEXT NOT NULL DEFAULT '',
+  键总数 INTEGER NOT NULL DEFAULT 0,
+  已写键数 INTEGER NOT NULL DEFAULT 0,
+  肇事键 TEXT NOT NULL DEFAULT '',
+  失败指纹 TEXT NOT NULL DEFAULT '',
+  开始时刻 TEXT NOT NULL,
+  收口时刻 TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS 半回_差 (
+  编号 INTEGER PRIMARY KEY AUTOINCREMENT,
+  趟号 INTEGER NOT NULL,
+  业务键 TEXT NOT NULL,
+  左金额分 INTEGER,
+  右金额分 INTEGER,
+  差型 TEXT NOT NULL,
+  说明 TEXT NOT NULL DEFAULT '',
+  可见 TEXT NOT NULL DEFAULT '在途',
+  时刻 TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS 半回_差_趟 ON 半回_差(趟号, 可见);
+CREATE TABLE IF NOT EXISTS 半回_悬账 (
+  编号 INTEGER PRIMARY KEY AUTOINCREMENT,
+  趟号 INTEGER NOT NULL,
+  业务键 TEXT NOT NULL,
+  悬边 TEXT NOT NULL,
+  金额分 INTEGER NOT NULL,
+  事件编号 TEXT NOT NULL DEFAULT '',
+  原因 TEXT NOT NULL,
+  可见 TEXT NOT NULL DEFAULT '在途',
+  时刻 TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS 半回_悬账_趟 ON 半回_悬账(趟号, 可见);
+CREATE TABLE IF NOT EXISTS 半回_归档 (
+  编号 INTEGER PRIMARY KEY AUTOINCREMENT,
+  趟号 INTEGER NOT NULL,
+  业务键 TEXT NOT NULL,
+  左金额分 INTEGER,
+  右金额分 INTEGER,
+  失败指纹 TEXT NOT NULL,
+  说明 TEXT NOT NULL DEFAULT '',
+  时刻 TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS 半回_切流账册 (
+  趟号 INTEGER PRIMARY KEY,
+  形态 TEXT NOT NULL,
+  失败指纹 TEXT NOT NULL DEFAULT '',
+  归档键 TEXT NOT NULL DEFAULT '',
+  现行差行数 INTEGER NOT NULL DEFAULT 0,
+  现行悬账数 INTEGER NOT NULL DEFAULT 0,
+  清回差行数 INTEGER NOT NULL DEFAULT 0,
+  清回悬账数 INTEGER NOT NULL DEFAULT 0,
+  时刻 TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS 半回_结论 (
+  编号 INTEGER PRIMARY KEY AUTOINCREMENT,
+  趟号 INTEGER NOT NULL,
+  形态 TEXT NOT NULL,
+  现行差行数 INTEGER NOT NULL,
+  悬账数 INTEGER NOT NULL,
+  归档键 TEXT NOT NULL DEFAULT '',
+  是否通过 INTEGER NOT NULL,
+  说明 TEXT NOT NULL DEFAULT '',
+  时刻 TEXT NOT NULL
+);
+"""
+
+
+def 确保库() -> None:
+    conn = 连接()
+    try:
+        conn.executescript(建表)
+        conn.commit()
+    finally:
+        conn.close()
